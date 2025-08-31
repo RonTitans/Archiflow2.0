@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(F:\\netbox-main\\netbox\\ipam\\models/**)",
+      "Read(F:\\netbox-main\\netbox\\templates\\base/**)",
+      "Read(F:\\netbox-main\\netbox\\project-static\\dist/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: archiflow-db
+    environment:
+      POSTGRES_DB: archiflow
+      POSTGRES_USER: archiflow
+      POSTGRES_PASSWORD: archiflow_secure_pass_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - archiflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U archiflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: archiflow-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json
+      - ./pgadmin/pgpass.conf:/tmp/pgpass:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - archiflow-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: archiflow-backend
+    entrypoint: ["sh", "/app/entrypoint.sh"]
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: 'True'
+      DATABASE_HOST: postgres
+      DATABASE_NAME: archiflow
+      DATABASE_USER: archiflow
+      DATABASE_PASSWORD: archiflow_secure_pass_2024
+      DATABASE_PORT: 5432
+      SECRET_KEY: 'django-insecure-dev-key-change-in-production-2024'
+      ALLOWED_HOSTS: '*'
+      CORS_ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - archiflow-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: archiflow-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/ws
+      WATCHPACK_POLLING: 'true'
+    command: npm run dev
+    depends_on:
+      - backend
+    networks:
+      - archiflow-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: archiflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - archiflow-network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  static_volume:
+  media_volume:
+  redis_data:
+
+networks:
+  archiflow-network:
+    driver: bridge
